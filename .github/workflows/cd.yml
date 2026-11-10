@@ -12,7 +12,7 @@
 #   No hay ningun "if rama == ..." ni un workflow por ambiente: el mismo
 #   pipeline sirve a los tres y solo puede tocar el ambiente de su rama.
 #
-#   terraform-apply -> build-push -> deploy-canary
+#   terraform-apply -> build-push (tag = hash del contenido) -> deploy-canary
 # =============================================================================
 name: CD
 
@@ -58,10 +58,13 @@ jobs:
       version: ${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: Calcular version (SHA corto del commit)
+      # La version es el hash del CONTENIDO (arbol de archivos), no del commit:
+      # el merge commit cambia en cada rama, el contenido promovido no. Asi
+      # dev, test y prod despliegan la misma imagen.
+      - name: Calcular version (hash del arbol de archivos)
         id: version
-        run: echo "version=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-      - name: Construir y publicar imagenes en ECR
+        run: echo "version=$(git rev-parse --short=7 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+      - name: Publicar imagenes en ECR (se reutilizan si ya existen)
         run: scripts/build-push.sh "${{ steps.version.outputs.version }}"
 
   # ---------------------------------------------------------------------------

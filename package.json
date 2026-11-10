@@ -10,9 +10,9 @@
   ],
   "scripts": {
     "lint": "eslint . && node scripts/ci/validate-graphql-schema.mjs",
-    "test:unit": "node --test \"packages/*/test/**/*.test.js\" \"services/*/test/**/*.test.js\"",
-    "test:integration": "node --test --test-concurrency=1 \"tests/integration/**/*.test.js\"",
-    "test:e2e": "node --test --test-concurrency=1 \"tests/e2e/**/*.test.js\""
+    "test:unit": "node --test --test-reporter=spec \"packages/*/test/**/*.test.js\" \"services/*/test/**/*.test.js\"",
+    "test:integration": "node --test --test-reporter=spec --test-concurrency=1 \"tests/integration/**/*.test.js\"",
+    "test:e2e": "node --test --test-reporter=spec --test-concurrency=1 \"tests/e2e/**/*.test.js\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

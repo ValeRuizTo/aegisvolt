@@ -14,3 +14,7 @@ __pycache__/
 *.pyc
 .DS_Store
 *.log
+
+# El provider esta fijado a una version exacta en el codigo. El archivo de bloqueo
+# guarda checksums por plataforma y el generado en Windows no sirve al runner Linux.
+.terraform.lock.hcl

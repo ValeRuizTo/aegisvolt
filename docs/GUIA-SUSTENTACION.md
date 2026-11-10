@@ -133,8 +133,13 @@ va en `null` y la URI usa el DNS del NLB: es una sola línea en
 **Demostración.**
 ```bash
 git checkout test && git commit --allow-empty -m "prueba push directo"
-git push origin test              # rechazado: "Changes must be made through a pull request"
-git push --force origin test      # rechazado: protected branch
+git push origin test              # rechazado
+git push --force origin test      # rechazado
+# Salida real en ambos casos:
+#   remote: error: GH006: Protected branch update failed for refs/heads/test.
+#   remote: - Changes must be made through a pull request.
+#   remote: - 6 of 6 required status checks are expected.
+#   ! [remote rejected] test -> test (protected branch hook declined)
 git reset --hard origin/test && git checkout dev
 gh api repos/{owner}/{repo}/branches/test/protection \
   --jq '{force_push: .allow_force_pushes.enabled, pr_obligatorio: (.required_pull_request_reviews != null), admins: .enforce_admins.enabled, checks: .required_status_checks.contexts}'

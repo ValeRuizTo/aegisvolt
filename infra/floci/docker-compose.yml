@@ -1,0 +1,52 @@
+# Floci: emulador local de AWS (S3, DynamoDB, EC2/VPC, API Gateway, CloudWatch, EKS...).
+# Todos los servicios AWS quedan disponibles en http://localhost:4566
+#
+# Levantar:  docker compose -f infra/floci/docker-compose.yml up -d
+name: aegisvolt-floci
+services:
+  floci:
+    image: floci/floci:2.4.0
+    container_name: aegisvolt-floci
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_DEFAULT_REGION: us-east-1
+      # Nombre con el que otros contenedores (k3s de EKS, runner de CI, Prefect)
+      # encuentran a Floci dentro de la red Docker compartida.
+      FLOCI_HOSTNAME: floci
+      # "persistent": cada escritura se guarda en disco de forma sincrona, asi el
+      # estado de Terraform (y sus versiones en S3) y las tablas DynamoDB
+      # sobreviven a un reinicio del contenedor.
+      FLOCI_STORAGE_MODE: persistent
+      FLOCI_STORAGE_PERSISTENT_PATH: /app/data
+      # El socket de Docker Desktop pertenece a root dentro del contenedor.
+      FLOCI_RUN_AS_ROOT: "true"
+      # EKS "real": cada aws_eks_cluster de Terraform arranca un contenedor k3s
+      # (Kubernetes de verdad) conectado a esta misma red.
+      FLOCI_SERVICES_EKS_DOCKER_NETWORK: aegisvolt-net
+      FLOCI_SERVICES_DOCKER_NETWORK: aegisvolt-net
+      # Si Floci se reinicia, los clusters k3s siguen vivos (no se pierden los pods).
+      FLOCI_SERVICES_EKS_KEEP_RUNNING_ON_SHUTDOWN: "true"
+    volumes:
+      - floci-data:/app/data
+      # Necesario para los servicios respaldados por Docker (EKS -> k3s).
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      aegisvolt-net:
+        aliases: [floci]
+        # IP fija: los pods de Kubernetes no resuelven nombres de Docker, asi que
+        # llegan a Floci por esta direccion (equivale al DNS de un VPC Endpoint).
+        ipv4_address: 172.30.0.10
+    restart: unless-stopped
+
+networks:
+  aegisvolt-net:
+    name: aegisvolt-net
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+          gateway: 172.30.0.1
+
+volumes:
+  floci-data:
+    name: aegisvolt-floci-data

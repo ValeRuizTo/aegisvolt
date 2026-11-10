@@ -1,0 +1,54 @@
+# =============================================================================
+# PLANTILLA del frontend (nginx con la aplicacion web compilada)
+#
+# Variables: ${IMAGE}, ${VERSION}
+# Se actualiza con RollingUpdate (sin canary: es contenido estatico).
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: aegisvolt
+  labels:
+    app: frontend
+    app.kubernetes.io/part-of: aegisvolt
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: frontend
+        version: "${VERSION}"
+    spec:
+      containers:
+        - name: web
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 1
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 24Mi
+            limits:
+              memory: 96Mi

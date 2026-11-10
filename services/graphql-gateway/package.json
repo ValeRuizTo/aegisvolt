@@ -1,0 +1,18 @@
+{
+  "name": "graphql-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capa de agregacion GraphQL y orquestador SAGA de AegisVolt",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@aegisvolt/common": "*",
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/express5": "^1.1.2",
+    "@aws-sdk/lib-dynamodb": "^3.1165.0",
+    "graphql": "^16.11.0"
+  }
+}

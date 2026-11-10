@@ -1,0 +1,15 @@
+{
+  "name": "station-reservation-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Gestion de disponibilidad y bloqueo temporal de bahias de carga",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@aegisvolt/common": "*",
+    "@aws-sdk/lib-dynamodb": "^3.1165.0"
+  }
+}

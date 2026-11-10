@@ -1,0 +1,15 @@
+{
+  "name": "energy-dispatch-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Orden de activacion fisica del cargador y registro de telemetria",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@aegisvolt/common": "*",
+    "@aws-sdk/lib-dynamodb": "^3.1165.0"
+  }
+}

@@ -1,0 +1,93 @@
+# =============================================================================
+# PLANTILLA de un microservicio (se rellena con envsubst en scripts/deploy)
+#
+# Variables:
+#   ${SERVICE}   nombre del microservicio          ej. billing-wallet-service
+#   ${TRACK}     stable | canary
+#   ${REPLICAS}  numero de pods de este track
+#   ${IMAGE}     imagen completa con tag           ej. .../billing-wallet-service:ab12cd3
+#   ${VERSION}   tag de la imagen (SHA del commit)
+#   ${FAULT_INJECTION_RATE}  0 normalmente (solo demo de canary defectuoso)
+#
+# CANARY: se despliegan DOS Deployments del mismo servicio:
+#   <servicio>-stable  (4 replicas, version actual)
+#   <servicio>-canary  (1 replica,  version nueva)
+# Ambos llevan la etiqueta app=<servicio>, que es la UNICA que usa el Service
+# como selector. Por eso el Service reparte el trafico entre los 5 pods:
+# 1 de 5 = 20 % va a la version nueva y 80 % a la estable.
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${SERVICE}-${TRACK}
+  namespace: aegisvolt
+  labels:
+    app: ${SERVICE}
+    track: ${TRACK}
+    app.kubernetes.io/part-of: aegisvolt
+spec:
+  replicas: ${REPLICAS}
+  selector:
+    matchLabels:
+      app: ${SERVICE}
+      track: ${TRACK}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1        # crea 1 pod nuevo...
+      maxUnavailable: 0  # ...antes de quitar uno viejo => sin tiempo de caida
+  template:
+    metadata:
+      labels:
+        app: ${SERVICE}
+        track: ${TRACK}
+        version: "${VERSION}"
+    spec:
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: app
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          envFrom:
+            # Configuracion del AMBIENTE (tablas, endpoint AWS, grupo de logs...).
+            - configMapRef:
+                name: aegisvolt-config
+            - secretRef:
+                name: aegisvolt-aws-credentials
+          env:
+            - name: SERVICE_NAME
+              value: ${SERVICE}
+            - name: DEPLOY_TRACK
+              value: ${TRACK}
+            - name: APP_VERSION
+              value: "${VERSION}"
+            - name: FAULT_INJECTION_RATE
+              value: "${FAULT_INJECTION_RATE}"
+          # Readiness: el pod solo recibe trafico del Service cuando /health responde.
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 3
+          # Liveness: si /health deja de responder, Kubernetes reinicia el contenedor.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000

@@ -1,0 +1,147 @@
+# =============================================================================
+# CI - PRE-MERGE (se ejecuta en cada Pull Request hacia dev, test o prod)
+#
+# Cada job es un "check" obligatorio en la proteccion de ramas: el boton de
+# Merge no se habilita hasta que TODOS esten en verde.
+#
+#   promotion-policy   Verifica la cadena feature/* -> dev -> test -> prod
+#   lint-build         Lint, esquema GraphQL e imagenes Docker
+#   unit-tests         Logica de negocio y compensaciones SAGA
+#   integration-tests  Tablas DynamoDB y endpoint GraphQL
+#   e2e-tests          Flujo completo desde el Frontend/API
+#   terraform-plan     Plan del workspace que corresponde a la rama DESTINO
+#
+# Los jobs corren en un runner auto-hospedado dentro de la red Docker de Floci
+# (el emulador de AWS no es alcanzable desde los runners de GitHub en la nube).
+# =============================================================================
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, test, prod]
+
+# Un push nuevo al mismo PR cancela la ejecucion anterior.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  FLOCI_ENDPOINT: http://floci:4566
+  # La rama DESTINO del PR decide el ambiente (y el workspace de Terraform).
+  TARGET_ENV: ${{ github.base_ref }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  promotion-policy:
+    name: promotion-policy
+    runs-on: [self-hosted, aegisvolt]
+    steps:
+      - name: Validar origen y destino del Pull Request
+        env:
+          SOURCE: ${{ github.head_ref }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          echo "Pull Request: $SOURCE -> $TARGET"
+          case "$TARGET" in
+            dev)
+              # A dev solo entran ramas de trabajo.
+              [[ "$SOURCE" =~ ^(feature|fix|hotfix|chore|docs)/ ]] \
+                || { echo "::error::A 'dev' solo se fusionan ramas feature/*, fix/*, hotfix/*, chore/* o docs/* (origen: $SOURCE)"; exit 1; } ;;
+            test)
+              # A test solo se promueve desde dev.
+              [[ "$SOURCE" == "dev" ]] \
+                || { echo "::error::A 'test' solo se promueve desde 'dev' (origen: $SOURCE)"; exit 1; } ;;
+            prod)
+              # A prod solo se promueve desde test.
+              [[ "$SOURCE" == "test" ]] \
+                || { echo "::error::A 'prod' solo se promueve desde 'test' (origen: $SOURCE)"; exit 1; } ;;
+          esac
+          echo "Promocion valida: $SOURCE -> $TARGET"
+
+  # ---------------------------------------------------------------------------
+  lint-build:
+    name: lint-build
+    runs-on: [self-hosted, aegisvolt]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Instalar dependencias
+        run: npm ci --no-audit --no-fund
+      - name: Lint y validacion del esquema GraphQL
+        run: npm run lint
+      - name: Validar formato y sintaxis de Terraform
+        run: |
+          terraform -chdir=infra/terraform/platform fmt -check -recursive
+          terraform -chdir=infra/terraform/bootstrap fmt -check
+      - name: Construir imagenes Docker (sin publicar)
+        run: BUILD_ONLY=true scripts/build-push.sh "pr-${{ github.event.pull_request.number }}"
+
+  # ---------------------------------------------------------------------------
+  unit-tests:
+    name: unit-tests
+    runs-on: [self-hosted, aegisvolt]
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --no-audit --no-fund
+      - name: Pruebas unitarias (logica de negocio y compensaciones SAGA)
+        run: npm run test:unit
+
+  # ---------------------------------------------------------------------------
+  integration-tests:
+    name: integration-tests
+    runs-on: [self-hosted, aegisvolt]
+    env:
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --no-audit --no-fund
+      - name: Pruebas de integracion (DynamoDB + endpoint GraphQL)
+        run: npm run test:integration
+
+  # ---------------------------------------------------------------------------
+  e2e-tests:
+    name: e2e-tests
+    runs-on: [self-hosted, aegisvolt]
+    env:
+      # Dentro de la red Docker el frontend del stack E2E se alcanza por nombre.
+      E2E_BASE_URL: http://aegisvolt-e2e-frontend:8080
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm ci --no-audit --no-fund
+      - name: Pruebas de extremo a extremo (stack completo en contenedores)
+        run: scripts/ci/e2e.sh
+
+  # ---------------------------------------------------------------------------
+  terraform-plan:
+    name: terraform-plan
+    runs-on: [self-hosted, aegisvolt]
+    steps:
+      - uses: actions/checkout@v4
+      - name: terraform plan sobre el workspace de la rama destino
+        id: plan
+        run: |
+          echo "Rama destino: $TARGET_ENV  ->  terraform workspace select $TARGET_ENV"
+          set -o pipefail
+          scripts/tf.sh "$TARGET_ENV" plan -no-color -out=tfplan 2>&1 | tee plan.txt
+      - name: Adjuntar el plan al resumen del job
+        if: always()
+        run: |
+          {
+            echo "## terraform plan - workspace \`$TARGET_ENV\`"
+            echo '```'
+            grep -E '^(Plan:|No changes|Error|  # )' plan.txt || tail -20 plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Guardar el plan como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan-${{ github.base_ref }}
+          path: plan.txt
+          retention-days: 14

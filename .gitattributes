@@ -1,0 +1,4 @@
+# Finales de linea LF en todo el repo: los scripts corren en bash (Git Bash y Linux).
+* text=auto eol=lf
+*.sh text eol=lf
+*.png binary

@@ -1,0 +1,14 @@
+**/node_modules
+**/test
+tests
+.git
+.github
+.kube
+.terraform
+infra
+docs
+observability
+k8s
+scripts
+frontend/dist
+*.md

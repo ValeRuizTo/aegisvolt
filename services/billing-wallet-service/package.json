@@ -1,0 +1,15 @@
+{
+  "name": "billing-wallet-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Verificacion de fondos, cobro y reembolso a la billetera de la flota",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "@aegisvolt/common": "*",
+    "@aws-sdk/lib-dynamodb": "^3.1165.0"
+  }
+}

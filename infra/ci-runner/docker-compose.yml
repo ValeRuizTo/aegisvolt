@@ -1,0 +1,41 @@
+# =============================================================================
+# Runner de GitHub Actions (auto-hospedado, en la red de Floci)
+#
+#   scripts/ci/start-runner.sh      (obtiene el token y lo levanta)
+#
+# Variables requeridas (las exporta start-runner.sh):
+#   GITHUB_REPO_URL   https://github.com/<usuario>/aegisvolt
+#   RUNNER_TOKEN      token de registro de un solo uso (gh api .../registration-token)
+# =============================================================================
+name: aegisvolt-ci
+services:
+  runner:
+    build: .
+    image: aegisvolt/ci-runner:latest
+    container_name: aegisvolt-ci-runner
+    environment:
+      REPO_URL: ${GITHUB_REPO_URL}
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      RUNNER_NAME: aegisvolt-local
+      RUNNER_SCOPE: repo
+      LABELS: aegisvolt
+      RUNNER_WORKDIR: /tmp/runner/work
+      DISABLE_AUTO_UPDATE: "true"
+      # El runner corre como root para poder usar el socket de Docker del host.
+      RUN_AS_ROOT: "true"
+      TF_PLUGIN_CACHE_DIR: /opt/tf-plugin-cache
+    volumes:
+      # Docker del host: los jobs construyen imagenes y levantan el stack E2E.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - tf-plugin-cache:/opt/tf-plugin-cache
+    networks: [aegisvolt-net]
+    restart: unless-stopped
+
+networks:
+  aegisvolt-net:
+    external: true
+    name: aegisvolt-net
+
+volumes:
+  tf-plugin-cache:
+    name: aegisvolt-ci-tf-cache

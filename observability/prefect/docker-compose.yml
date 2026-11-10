@@ -1,0 +1,57 @@
+# =============================================================================
+# Prefect: servidor (API + dashboard) y proceso que ejecuta los flujos.
+#
+#   docker compose -f observability/prefect/docker-compose.yml up -d --build
+#   Dashboard: http://localhost:4200
+#
+# Ambos contenedores viven en la red "aegisvolt-net" (la de Floci), por eso los
+# flujos alcanzan DynamoDB/CloudWatch en http://floci:4566 y cada ambiente a
+# traves de su API Gateway.
+# =============================================================================
+name: aegisvolt-prefect
+services:
+  prefect-server:
+    build: .
+    image: aegisvolt/prefect:latest
+    container_name: aegisvolt-prefect-server
+    command: prefect server start --host 0.0.0.0
+    environment:
+      PREFECT_UI_API_URL: http://localhost:4200/api
+      PREFECT_SERVER_ANALYTICS_ENABLED: "false"
+    ports:
+      - "4200:4200"
+    volumes:
+      - prefect-data:/root/.prefect
+    networks: [aegisvolt-net]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4200/api/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  prefect-flows:
+    image: aegisvolt/prefect:latest
+    container_name: aegisvolt-prefect-flows
+    depends_on:
+      prefect-server:
+        condition: service_healthy
+    environment:
+      PREFECT_API_URL: http://prefect-server:4200/api
+      AWS_ENDPOINT_URL: http://floci:4566
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AEGISVOLT_ENVIRONMENTS: dev,test,prod
+      AUDIT_INTERVAL_SECONDS: "120"
+    networks: [aegisvolt-net]
+    restart: unless-stopped
+
+networks:
+  aegisvolt-net:
+    external: true
+    name: aegisvolt-net
+
+volumes:
+  prefect-data:
+    name: aegisvolt-prefect-data

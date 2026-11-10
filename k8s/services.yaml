@@ -1,0 +1,88 @@
+# =============================================================================
+# Namespace y Services (estables: no cambian entre despliegues)
+#
+# Un Service da un nombre DNS y una IP fijos a un conjunto cambiante de pods.
+# El selector usa SOLO "app": incluye a los pods stable y canary a la vez.
+#
+#   * Los 3 microservicios son ClusterIP: solo alcanzables DENTRO del cluster.
+#   * graphql-gateway y frontend son NodePort: unica entrada desde fuera, y solo
+#     la usa el API Gateway (a traves del VPC Link / NLB interno).
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aegisvolt
+  labels:
+    app.kubernetes.io/part-of: aegisvolt
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: station-reservation-service
+  namespace: aegisvolt
+spec:
+  type: ClusterIP
+  selector:
+    app: station-reservation-service
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: billing-wallet-service
+  namespace: aegisvolt
+spec:
+  type: ClusterIP
+  selector:
+    app: billing-wallet-service
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: energy-dispatch-service
+  namespace: aegisvolt
+spec:
+  type: ClusterIP
+  selector:
+    app: energy-dispatch-service
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphql-gateway
+  namespace: aegisvolt
+spec:
+  type: NodePort
+  selector:
+    app: graphql-gateway
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      nodePort: 30080 # destino de la ruta /graphql del API Gateway
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: aegisvolt
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      nodePort: 30081 # destino de las rutas / y /{proxy+} del API Gateway

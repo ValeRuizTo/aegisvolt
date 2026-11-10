@@ -1,0 +1,89 @@
+# =============================================================================
+# CD - POST-MERGE (se ejecuta cuando un Pull Request se fusiona en dev/test/prod)
+#
+# DETECCION DINAMICA DEL AMBIENTE
+#   Un merge produce un evento "push" sobre la rama destino. El nombre de esa
+#   rama esta en github.ref_name y ES el nombre del ambiente:
+#
+#       merge a dev   -> TARGET_ENV=dev   -> terraform workspace select dev
+#       merge a test  -> TARGET_ENV=test  -> terraform workspace select test
+#       merge a prod  -> TARGET_ENV=prod  -> terraform workspace select prod
+#
+#   No hay ningun "if rama == ..." ni un workflow por ambiente: el mismo
+#   pipeline sirve a los tres y solo puede tocar el ambiente de su rama.
+#
+#   terraform-apply -> build-push -> deploy-canary
+# =============================================================================
+name: CD
+
+on:
+  push:
+    branches: [dev, test, prod]
+
+# Un solo despliegue a la vez por ambiente (no se cancelan despliegues en curso).
+concurrency:
+  group: cd-${{ github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FLOCI_ENDPOINT: http://floci:4566
+  TARGET_ENV: ${{ github.ref_name }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  terraform-apply:
+    name: terraform-apply (${{ github.ref_name }})
+    runs-on: [self-hosted, aegisvolt]
+    steps:
+      - uses: actions/checkout@v4
+      - name: terraform apply -auto-approve en el workspace de la rama
+        run: |
+          echo "Rama fusionada: $TARGET_ENV  ->  terraform workspace select $TARGET_ENV"
+          scripts/tf.sh "$TARGET_ENV" apply -no-color
+      - name: Resumen
+        run: |
+          {
+            echo "## Infraestructura aplicada en \`$TARGET_ENV\`"
+            echo "Estado: \`s3://aegisvolt-tfstate/env:/$TARGET_ENV/platform/terraform.tfstate\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  build-push:
+    name: build-push
+    runs-on: [self-hosted, aegisvolt]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Calcular version (SHA corto del commit)
+        id: version
+        run: echo "version=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+      - name: Construir y publicar imagenes en ECR
+        run: scripts/build-push.sh "${{ steps.version.outputs.version }}"
+
+  # ---------------------------------------------------------------------------
+  deploy-canary:
+    name: deploy-canary (${{ github.ref_name }})
+    needs: [terraform-apply, build-push]
+    runs-on: [self-hosted, aegisvolt]
+    env:
+      # Identidad IAM con la que kubectl se autentica contra EKS.
+      DEPLOYER_ACCESS_KEY_ID: ${{ secrets.DEPLOYER_ACCESS_KEY_ID }}
+      DEPLOYER_SECRET_ACCESS_KEY: ${{ secrets.DEPLOYER_SECRET_ACCESS_KEY }}
+      # El API server de EKS se alcanza por la red Docker, no por localhost.
+      KUBE_API_IN_NETWORK: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Canary deployment (20 % -> analisis -> 100 % o rollback)
+        run: scripts/deploy/deploy.sh "$TARGET_ENV" "${{ needs.build-push.outputs.version }}"
+      - name: Resumen
+        if: always()
+        run: |
+          {
+            echo "## Despliegue en \`$TARGET_ENV\` - version \`${{ needs.build-push.outputs.version }}\`"
+            echo "Resultado: **${{ job.status }}**"
+            echo "URL: http://localhost:4566/execute-api/aegisvolt-$TARGET_ENV/$TARGET_ENV/"
+          } >> "$GITHUB_STEP_SUMMARY"

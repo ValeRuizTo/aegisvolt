@@ -1,0 +1,60 @@
+# =============================================================================
+# Stack efimero para las pruebas E2E del Pull Request
+#
+# Levanta la plataforma completa con las imagenes Docker reales (las mismas que
+# luego se despliegan), contra tablas DynamoDB temporales en Floci. Asi el PR se
+# valida de extremo a extremo SIN tocar los ambientes dev/test/prod.
+#
+#   scripts/ci/e2e.sh        (crea tablas -> up -> pruebas -> down -> borra tablas)
+# =============================================================================
+name: aegisvolt-e2e
+
+x-service-env: &service-env
+  APP_ENV: ${E2E_ENV}
+  AWS_REGION: us-east-1
+  AWS_ENDPOINT_URL: http://floci:4566
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  CLOUDWATCH_LOGS_ENABLED: "true"
+  CLOUDWATCH_METRICS_ENABLED: "false"
+
+services:
+  station-reservation-service:
+    build: { context: ../.., dockerfile: services/station-reservation-service/Dockerfile }
+    environment: *service-env
+    networks: [aegisvolt-net]
+
+  billing-wallet-service:
+    build: { context: ../.., dockerfile: services/billing-wallet-service/Dockerfile }
+    environment: *service-env
+    networks: [aegisvolt-net]
+
+  energy-dispatch-service:
+    build: { context: ../.., dockerfile: services/energy-dispatch-service/Dockerfile }
+    environment: *service-env
+    networks: [aegisvolt-net]
+
+  graphql-gateway:
+    build: { context: ../.., dockerfile: services/graphql-gateway/Dockerfile }
+    environment:
+      <<: *service-env
+      STATION_SERVICE_URL: http://station-reservation-service:3000
+      BILLING_SERVICE_URL: http://billing-wallet-service:3000
+      DISPATCH_SERVICE_URL: http://energy-dispatch-service:3000
+    depends_on: [station-reservation-service, billing-wallet-service, energy-dispatch-service]
+    networks: [aegisvolt-net]
+
+  frontend:
+    build: { context: ../../frontend }
+    container_name: aegisvolt-e2e-frontend
+    environment:
+      GRAPHQL_UPSTREAM: graphql-gateway:3000
+    depends_on: [graphql-gateway]
+    ports:
+      - "8088:8080"
+    networks: [aegisvolt-net]
+
+networks:
+  aegisvolt-net:
+    external: true
+    name: aegisvolt-net

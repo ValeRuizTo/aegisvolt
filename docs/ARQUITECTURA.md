@@ -323,7 +323,13 @@ env:
 run: scripts/tf.sh "$TARGET_ENV" apply      # → terraform workspace select $TARGET_ENV + apply -auto-approve
 ```
 
-`terraform-apply` → `build-push` (tag = SHA corto) → `deploy-canary`.
+`terraform-apply` → `build-push` → `deploy-canary`.
+
+**Una sola imagen para los tres ambientes.** El tag es el hash del *árbol de archivos*
+(`git rev-parse HEAD^{tree}`), no el del commit. Cada promoción crea un merge commit distinto, pero
+el contenido es idéntico, así que el tag coincide en `dev`, `test` y `prod`.
+[build-push.sh](../scripts/build-push.sh) no reconstruye una imagen que ya está en ECR: `test` y
+`prod` reciben los mismos bytes que se probaron en `dev`.
 
 ### 3.4 Runner auto-hospedado
 

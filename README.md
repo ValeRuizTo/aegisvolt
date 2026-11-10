@@ -116,6 +116,7 @@ una limitación del emulador que se explica.
 | Flujos de Prefect (salud, SAGAs huérfanas, métricas) | Probado | Dashboard en :4200 |
 | Canary 20 % → análisis → 100 % o rollback | Probado | `scripts/deploy/canary.sh`, `scripts/demo/canary-rollback.sh` |
 | Frontend conectado al GraphQL de cada ambiente | Probado | Cuatro paneles + sesiones + billeteras |
-| Pipelines CI (PR) y CD (merge) | Ver [OPERACION.md](docs/OPERACION.md#github) | Requieren el repositorio en GitHub |
-| Protección de ramas (sin force push ni push directo) | Ver [OPERACION.md](docs/OPERACION.md#github) | Requieren el repositorio en GitHub |
+| Pipeline CI en cada Pull Request (6 checks) | Probado | Ejecutado en GitHub Actions sobre el runner auto-hospedado |
+| Pipeline CD tras el merge (apply + canary por rama) | Probado | `feature/* → dev → test → prod` recorrido completo |
+| Protección de ramas (sin force push ni push directo) | Probado | `git push` a `test` rechazado con `GH006` |
 | "Tiempo real" en el frontend | Parcial | Sondeo cada 2,5 s (no WebSocket) |

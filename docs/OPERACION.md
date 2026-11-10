@@ -116,6 +116,7 @@ promociones no generen conflictos.
 | *Error acquiring the state lock* | Un `apply` anterior se interrumpió | `scripts/tf.sh <env> force-unlock <ID>` |
 | Un job del pipeline queda *Queued* | El runner no está en línea | `docker logs aegisvolt-ci-runner`; `scripts/ci/start-runner.sh` |
 | Prefect no muestra ejecuciones | Contenedor de flujos detenido | `docker compose -f observability/prefect/docker-compose.yml up -d` |
+| Un job falla con `Permission denied` al ejecutar un `.sh` | Script nuevo creado en Windows sin bit de ejecución | `git update-index --chmod=+x ruta/al/script.sh` y commit |
 | Curl a `/dev/null` falla en Git Bash | Conversión de rutas desactivada por `env.sh` | Usar `-o NUL` (los scripts usan `$NULL_DEVICE`) |
 
 ## Reiniciar los datos de demostración de un ambiente

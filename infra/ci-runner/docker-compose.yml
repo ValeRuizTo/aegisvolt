@@ -17,12 +17,8 @@ services:
       REPO_URL: ${GITHUB_REPO_URL}
       RUNNER_TOKEN: ${RUNNER_TOKEN}
       RUNNER_NAME: aegisvolt-local
-      RUNNER_SCOPE: repo
       LABELS: aegisvolt
       RUNNER_WORKDIR: /tmp/runner/work
-      DISABLE_AUTO_UPDATE: "true"
-      # El runner corre como root para poder usar el socket de Docker del host.
-      RUN_AS_ROOT: "true"
       TF_PLUGIN_CACHE_DIR: /opt/tf-plugin-cache
     volumes:
       # Docker del host: los jobs construyen imagenes y levantan el stack E2E.

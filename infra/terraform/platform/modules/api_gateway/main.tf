@@ -38,8 +38,8 @@ variable "emulated_node_host" {
 
 locals {
   backends = {
-    graphql  = var.graphql_node_port
-    frontend = var.frontend_node_port
+    graphql  = { port = var.graphql_node_port, health_path = "/health" }
+    frontend = { port = var.frontend_node_port, health_path = "/healthz" }
   }
 
   # Host al que el API Gateway envia la peticion.
@@ -62,14 +62,17 @@ resource "aws_lb_target_group" "backend" {
   for_each = local.backends
 
   name        = "${var.name_prefix}-${each.key}"
-  port        = each.value
+  port        = each.value.port
   protocol    = "TCP"
   target_type = "instance"
   vpc_id      = var.vpc_id
 
+  # El NLB solo envia trafico a un nodo si el servicio responde en su ruta de salud.
   health_check {
-    protocol = "TCP"
+    protocol = "HTTP"
     port     = "traffic-port"
+    path     = each.value.health_path
+    matcher  = "200-399"
   }
 }
 
@@ -77,7 +80,7 @@ resource "aws_lb_listener" "backend" {
   for_each = local.backends
 
   load_balancer_arn = aws_lb.internal.arn
-  port              = each.value
+  port              = each.value.port
   protocol          = "TCP"
 
   default_action {
@@ -110,6 +113,12 @@ resource "aws_api_gateway_rest_api" "this" {
     # Floci permite fijar el ID de la API con este tag. Asi la URL de cada
     # ambiente es estable y legible: .../execute-api/aegisvolt-dev/dev/
     "floci:override-id" = var.name_prefix
+  }
+
+  # Floci consume ese tag al crear la API y no lo devuelve; sin esto cada plan
+  # mostraria una diferencia falsa.
+  lifecycle {
+    ignore_changes = [tags["floci:override-id"], tags_all["floci:override-id"]]
   }
 }
 

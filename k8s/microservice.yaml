@@ -66,6 +66,13 @@ spec:
               value: "${VERSION}"
             - name: FAULT_INJECTION_RATE
               value: "${FAULT_INJECTION_RATE}"
+          # Antes de apagar el contenedor se esperan 5 s: da tiempo a que el Service
+          # deje de enviarle trafico. Sin esto, durante un rolling update alguna
+          # peticion puede llegar a un pod que ya se esta cerrando (error 502).
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sleep", "5"]
           # Readiness: el pod solo recibe trafico del Service cuando /health responde.
           readinessProbe:
             httpGet:

@@ -15,7 +15,14 @@ BASE_URL="${FLOCI_ENDPOINT}/execute-api/${PROJECT}-${ENV_NAME}/${ENV_NAME}"
 log "Prueba de humo de $ENV_NAME -> $BASE_URL"
 
 # 1. El frontend responde.
-code="$(curl -s -o "$NULL_DEVICE" -m 15 -w '%{http_code}' "$BASE_URL/" || true)"
+#    Se reintenta unos segundos: justo despues de un despliegue el API Gateway
+#    puede tardar un instante en ver los pods nuevos.
+code=""
+for _ in 1 2 3 4 5 6; do
+  code="$(curl -s -o "$NULL_DEVICE" -m 15 -w '%{http_code}' "$BASE_URL/" || true)"
+  [[ "$code" == "200" ]] && break
+  sleep 3
+done
 [[ "$code" == "200" ]] || die "El frontend respondio HTTP $code"
 
 # 2. GraphQL responde y reporta el ambiente correcto y los 4 servicios sanos.

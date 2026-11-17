@@ -1,7 +1,10 @@
-// Panel (b): flujo de reserva y activacion de carga = disparador de la SAGA.
+// Nueva carga: reservar un conector, retener el saldo y encender el cargador.
+// (Por dentro dispara la operacion distribuida reserveAndCharge.)
 import { useEffect, useMemo, useState } from 'react';
 import { gql, money, QUOTE_QUERY, RESERVE_MUTATION } from '../api.js';
-import { SagaSteps } from './SagaSteps.jsx';
+import { Icon } from '../icons.jsx';
+import { failureReason, undoSummary } from '../labels.js';
+import { OperationSteps, TechnicalDetail } from './SagaSteps.jsx';
 
 export function ReservePanel({ stations, wallets, flags, selection, onSelect, onDone }) {
   const [fleetId, setFleetId] = useState('');
@@ -20,7 +23,6 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
     if (!fleetId && wallets.length > 0) setFleetId(wallets[0].fleetId);
   }, [wallets, fleetId]);
 
-  // Si la flag se apaga mientras la casilla estaba marcada, se desmarca.
   useEffect(() => {
     if (!fastChargeEnabled) setFastCharge(false);
   }, [fastChargeEnabled]);
@@ -32,7 +34,8 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
           key: `${s.stationId}|${c.connectorId}`,
           stationId: s.stationId,
           connectorId: c.connectorId,
-          label: `${s.name} · ${c.connectorId} (${c.powerKw} kW)`,
+          stationName: s.name,
+          label: `${s.name} · ${c.connectorId} · ${c.powerKw} kW`,
           available: c.status === 'AVAILABLE',
           ultraFast: c.ultraFast,
         })),
@@ -42,7 +45,11 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
   const selected = options.find((o) => o.stationId === selection?.stationId && o.connectorId === selection?.connectorId);
   const wallet = wallets.find((w) => w.fleetId === fleetId);
 
-  // Cotizacion en vivo: cambia sola cuando se activa la tarifa dinamica.
+  useEffect(() => {
+    if (selected && !selected.ultraFast) setFastCharge(false);
+  }, [selected]);
+
+  // Precio estimado en vivo: cambia solo si se activa la tarifa de hora pico.
   useEffect(() => {
     const kwh = Number(estimatedKwh);
     if (!(kwh > 0)) {
@@ -72,41 +79,45 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
           connectorId: selected.connectorId,
           estimatedKwh: Number(estimatedKwh),
           fastCharge: fastCharge && fastChargeEnabled,
-          // Clave de idempotencia: un doble clic no crea dos SAGAs.
+          // Evita que un doble clic cree dos cargas.
           clientRequestId: crypto.randomUUID(),
         },
       });
-      setResult(data.reserveAndCharge);
+      setResult({ operation: data.reserveAndCharge, place: `${selected.stationName} · conector ${selected.connectorId}` });
       onSelect(null);
     } catch (err) {
-      setError(err.message);
+      setError(err.code === 'FAST_CHARGE_DISABLED' ? failureReason(err.code) : 'No pudimos registrar la carga. Inténtalo de nuevo en unos segundos.');
     } finally {
       setSubmitting(false);
       onDone();
     }
   }
 
+  const notEnoughBalance = wallet && quote && quote.total > wallet.balance;
+
   return (
-    <section className="panel panel-reserve" aria-labelledby="reserve-title">
-      <div className="panel-head">
-        <h2 id="reserve-title">Reservar y activar carga</h2>
-        <span className="hint">dispara la SAGA</span>
-      </div>
+    <section className="panel panel-primary" aria-labelledby="reserve-title">
+      <header className="panel-head">
+        <h2 id="reserve-title">
+          <Icon name="bolt" />
+          Nueva carga
+        </h2>
+      </header>
 
       <form onSubmit={submit} className="form">
-        <label>
-          Flota
+        <label className="field">
+          <span className="field-label">Flota</span>
           <select value={fleetId} onChange={(e) => setFleetId(e.target.value)} data-testid="fleet-select">
             {wallets.map((w) => (
               <option key={w.fleetId} value={w.fleetId}>
-                {w.fleetName} — {money(w.balance, w.currency)}
+                {w.fleetName} · saldo {money(w.balance, w.currency)}
               </option>
             ))}
           </select>
         </label>
 
-        <label>
-          Conector
+        <label className="field">
+          <span className="field-label">Conector</span>
           <select
             value={selected?.key ?? ''}
             onChange={(e) => {
@@ -115,31 +126,36 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
             }}
             data-testid="connector-select"
           >
-            <option value="">Seleccione un conector disponible…</option>
+            <option value="">Elige un conector libre</option>
             {options.map((o) => (
               <option key={o.key} value={o.key} disabled={!o.available}>
                 {o.label}
-                {o.available ? '' : ' — ocupado'}
+                {o.available ? '' : ' (ocupado)'}
               </option>
             ))}
           </select>
+          <span className="field-help">También puedes tocar un conector libre en la lista de electrolineras.</span>
         </label>
 
-        <label>
-          Energia estimada (kWh)
-          <input
-            type="number"
-            min="1"
-            max="500"
-            step="1"
-            value={estimatedKwh}
-            onChange={(e) => setEstimatedKwh(e.target.value)}
-            data-testid="kwh-input"
-          />
+        <label className="field">
+          <span className="field-label">Energía a cargar</span>
+          <span className="input-unit">
+            <input
+              type="number"
+              min="1"
+              max="500"
+              step="1"
+              inputMode="numeric"
+              value={estimatedKwh}
+              onChange={(e) => setEstimatedKwh(e.target.value)}
+              data-testid="kwh-input"
+            />
+            <span aria-hidden="true">kWh</span>
+          </span>
         </label>
 
         {fastChargeEnabled ? (
-          <label className="check" data-testid="fast-charge-option">
+          <label className={`check${selected && !selected.ultraFast ? ' is-disabled' : ''}`} data-testid="fast-charge-option">
             <input
               type="checkbox"
               checked={fastCharge}
@@ -147,77 +163,111 @@ export function ReservePanel({ stations, wallets, flags, selection, onSelect, on
               onChange={(e) => setFastCharge(e.target.checked)}
             />
             <span>
-              Ultra-carga prioritaria (+20 %)
-              {selected && !selected.ultraFast && <small> · requiere un conector de 150 kW o mas</small>}
+              <span className="check-title">Carga prioritaria (+20 %)</span>
+              <span className="check-help">
+                {selected && !selected.ultraFast
+                  ? 'Este conector no la admite: elige uno de 150 kW o más.'
+                  : 'Solo en conectores rápidos de 150 kW o más.'}
+              </span>
             </span>
           </label>
         ) : (
-          <p className="flag-note" data-testid="fast-charge-disabled">
-            Ultra-carga no disponible en este ambiente (flag <code>ENABLE_FAST_CHARGE_BOOST</code> apagada).
+          <p className="note" data-testid="fast-charge-disabled">
+            La carga prioritaria no está disponible en este ambiente.
           </p>
         )}
 
         {quote && (
-          <dl className="quote" data-testid="quote">
-            <div>
-              <dt>Tarifa base</dt>
-              <dd>{money(quote.baseAmount)}</dd>
+          <div className="quote" data-testid="quote">
+            <div className="quote-row">
+              <span>
+                Energía ({quote.estimatedKwh ?? Number(estimatedKwh)} kWh × {money(quote.pricePerKwh)})
+              </span>
+              <span>{money(quote.baseAmount)}</span>
             </div>
-            <div className={quote.surgeApplied ? 'quote-surge' : ''}>
-              <dt>Tarifa dinamica</dt>
-              <dd data-testid="quote-surge">{quote.surgeApplied ? `× ${quote.surgeMultiplier} (hora pico)` : 'no aplica'}</dd>
+            <div className={`quote-row${quote.surgeApplied ? ' is-surge' : ''}`}>
+              <span>Tarifa de hora pico</span>
+              <span data-testid="quote-surge">{quote.surgeApplied ? `× ${String(quote.surgeMultiplier).replace('.', ',')}` : 'No aplica'}</span>
             </div>
             {quote.fastChargeFee > 0 && (
-              <div>
-                <dt>Ultra-carga</dt>
-                <dd>{money(quote.fastChargeFee)}</dd>
+              <div className="quote-row">
+                <span>Carga prioritaria</span>
+                <span>{money(quote.fastChargeFee)}</span>
               </div>
             )}
             <div className="quote-total">
-              <dt>Total a retener</dt>
-              <dd data-testid="quote-total">{money(quote.total)}</dd>
+              <span>Se retiene de la billetera</span>
+              <span data-testid="quote-total">{money(quote.total)}</span>
             </div>
-          </dl>
+          </div>
         )}
 
-        {wallet && quote && quote.total > wallet.balance && (
-          <p className="warn">El saldo de la flota no alcanza: la SAGA fallara en el cobro y liberara el conector.</p>
+        {notEnoughBalance && (
+          <p className="callout callout-warn">
+            <Icon name="alert" />
+            <span>Esta flota no tiene saldo suficiente. Si continúas, la carga se cancelará sin cobrar nada.</span>
+          </p>
         )}
         {faultEnabled && (
-          <p className="warn" data-testid="fault-warning">
-            Inyeccion de fallos ACTIVA en este ambiente: el cargador reportara averia y la SAGA hara rollback.
+          <p className="callout callout-warn" data-testid="fault-warning">
+            <Icon name="alert" />
+            <span>
+              <strong>Simulación de averías activa.</strong> Los cargadores fallarán al encender y la carga se cancelará
+              sola.
+            </span>
           </p>
         )}
 
-        <button type="submit" className="primary" disabled={submitting || !selected || !fleetId} data-testid="reserve-button">
-          {submitting ? 'Ejecutando SAGA…' : 'Reservar y activar carga'}
+        <button type="submit" className="btn btn-primary" disabled={submitting || !selected || !fleetId} data-testid="reserve-button">
+          <Icon name="bolt" />
+          {submitting ? 'Iniciando carga…' : 'Reservar y empezar a cargar'}
         </button>
       </form>
 
       {error && (
-        <div className="banner banner-error" role="alert" data-testid="reserve-error">
-          {error}
-        </div>
+        <p className="callout callout-bad" role="alert" data-testid="reserve-error">
+          <Icon name="alert" />
+          <span>{error}</span>
+        </p>
       )}
 
-      {result && (
-        <div className={`result result-${result.status.toLowerCase()}`} data-testid="saga-result">
-          <p className="result-title">
-            {result.status === 'COMPLETED' && 'Carga activada'}
-            {result.status === 'COMPENSATED' && 'Operacion revertida (rollback distribuido)'}
-            {result.status === 'COMPENSATION_FAILED' && 'Rollback incompleto: requiere atencion'}
-          </p>
-          {result.failure && (
-            <p className="result-reason">
-              Fallo en <b>{result.failure.step}</b>: {result.failure.message}
-            </p>
-          )}
-          <SagaSteps saga={result} />
-          <p className="correlation">
-            correlation_id <code>{result.correlationId}</code>
+      {result && <OperationResult {...result} />}
+    </section>
+  );
+}
+
+function OperationResult({ operation, place }) {
+  const ok = operation.status === 'COMPLETED';
+  const partial = operation.status === 'COMPENSATION_FAILED';
+  return (
+    <div
+      className={`result ${ok ? 'result-ok' : partial ? 'result-bad' : 'result-warn'}`}
+      role="status"
+      data-testid="saga-result"
+    >
+      <div className="result-head">
+        <span className="result-icon" aria-hidden="true">
+          <Icon name={ok ? 'check' : 'undo'} size={18} />
+        </span>
+        <div>
+          <p className="result-title">{ok ? 'Carga iniciada' : 'No se pudo iniciar la carga'}</p>
+          <p className="result-text">
+            {ok && (
+              <>
+                {place}. Se retuvieron <strong>{money(operation.amount)}</strong> de la billetera.
+              </>
+            )}
+            {!ok && !partial && (
+              <>
+                {failureReason(operation.failure?.code)} {undoSummary(operation)}
+              </>
+            )}
+            {partial && 'No se pudo deshacer todo automáticamente. Revisa el historial antes de volver a intentarlo.'}
           </p>
         </div>
-      )}
-    </section>
+      </div>
+      <OperationSteps operation={operation} />
+      <TechnicalDetail operation={operation} />
+    </div>
   );
 }

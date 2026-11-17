@@ -211,9 +211,13 @@ scripts/demo/saga-fault.sh test
 # 1. Activar la flag SOLO en test
 scripts/demo/set-flag.sh test SIMULATE_CHARGER_HARDWARE_FAULT true
 ```
-2. En el frontend de `test`: aparece el aviso amarillo de inyección de fallos. Elegir un conector y
-   pulsar *Reservar y activar carga*. Resultado: *Operación revertida (rollback distribuido)*, con
-   "↩ compensado: saldo reembolsado" y "↩ compensado: conector liberado".
+2. En el frontend de `test` (barra ámbar) aparece, en *Nueva carga*, el aviso amarillo *"Simulación de
+   averías activa"*. Elegir un conector y pulsar *Reservar y empezar a cargar*. Resultado: *"No se pudo
+   iniciar la carga. El cargador reportó una falla… Liberamos el conector y devolvimos el dinero"*, con
+   los pasos "↩ Conector liberado", "↩ Dinero devuelto" y "✕ El cargador no encendió". La pantalla
+   habla en lenguaje del operador; para el profesor, abrir **Ver detalle técnico** debajo del
+   resultado: muestra la SAGA (`COMPENSATED`), cada paso con su servicio y su compensación
+   (`REFUND_WALLET: COMPENSATED`, `RELEASE_CONNECTOR: COMPENSATED`) y el `correlation_id`.
    (Por GraphQL directo:)
 ```bash
 curl -s -X POST http://localhost:4566/execute-api/aegisvolt-test/test/graphql -H 'content-type: application/json' \
@@ -240,8 +244,8 @@ El orquestador compensó en orden inverso: primero `REFUND_WALLET` (saldo restau
 `REFUND` con el motivo) y luego `RELEASE_CONNECTOR` (AVAILABLE). El paso 3 no se compensa porque el
 servicio respondió un rechazo definitivo: no llegó a iniciar nada.
 
-**Fallo en el paso 2 (fondos insuficientes):** en el frontend elegir la flota *Caribe Cargo (saldo
-bajo)*: la SAGA falla en `CHARGE_WALLET` y solo se ejecuta `RELEASE_CONNECTOR`.
+**Fallo en el paso 2 (fondos insuficientes):** en el frontend elegir la flota *Caribe Cargo* (tiene la
+etiqueta "Saldo bajo" en *Billeteras*): la SAGA falla en `CHARGE_WALLET` y solo se ejecuta `RELEASE_CONNECTOR`.
 
 ### *(PDF)* ¿Cómo evita su SAGA problemas de idempotencia si una compensación se procesa dos veces?
 
@@ -311,8 +315,8 @@ kubectl -n aegisvolt exec deploy/graphql-gateway-stable -c app -- node -e \
    ```bash
    docker exec aegisvolt-prefect-flows prefect deployment run 'aegisvolt-platform-observability/aegisvolt-observability'
    ```
-2. Tomar el `correlation_id` de la SAGA fallida (lo muestra el frontend, en el resultado y en el
-   detalle del historial) y rastrearlo:
+2. Tomar el `correlation_id` de la SAGA fallida (en el frontend: *Ver detalle técnico* debajo del
+   resultado, o *Historial de cargas* → *Ver pasos* → *Ver detalle técnico*) y rastrearlo:
    ```bash
    scripts/demo/trace.sh test <correlation_id>
    # equivalente crudo, un grupo:
@@ -341,15 +345,18 @@ línea JSON. Los grupos de logs están separados por ambiente (`/aegisvolt/test/
 ```bash
 scripts/demo/set-flag.sh dev ENABLE_DYNAMIC_SURGE_PRICING false
 ```
-En ≤ 5 s, en `dev`: el interruptor pasa a OFF y, en la cotización, *Tarifa dinámica* pasa de
-"× 1.5 (hora pico)" a "no aplica" y baja el *Total a retener*. En `prod` nada cambia.
+En ≤ 5 s, en `dev`: en *Ajustes del ambiente*, "Tarifa de hora pico" pasa a *Inactivo* y, en el
+precio de *Nueva carga*, "Tarifa de hora pico" pasa de "× 1,5" a "No aplica" y baja el total "Se
+retiene de la billetera". En `prod` nada cambia. (Los nombres internos de las flags se ven en el pie:
+*Detalle técnico del ambiente*.)
 ```bash
 scripts/demo/set-flag.sh prod       # lista las flags de prod: intactas
 kubectl -n aegisvolt get pods       # (use_cluster dev) AGE y RESTARTS sin cambios: no hubo redespliegue
 scripts/demo/set-flag.sh dev ENABLE_DYNAMIC_SURGE_PRICING true   # restaurar
 ```
-Variante más visual: `ENABLE_FAST_CHARGE_BOOST` hace aparecer/desaparecer la casilla de
-ultra-carga. También se puede cambiar con el interruptor del propio frontend.
+Variante más visual: `ENABLE_FAST_CHARGE_BOOST` ("Carga prioritaria") hace aparecer/desaparecer la
+casilla "Carga prioritaria (+20 %)". También se puede cambiar con el interruptor de *Ajustes del
+ambiente*.
 
 **Qué decir.** Cada ambiente tiene su tabla `aegisvolt-feature-flags-<env>`; los pods de `dev` solo
 reciben el nombre de la suya (ConfigMap generado desde los outputs de Terraform). Los servicios

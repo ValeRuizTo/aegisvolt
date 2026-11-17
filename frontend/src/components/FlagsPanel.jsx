@@ -1,16 +1,13 @@
-// Panel (c): Feature Flags activas en el ambiente actual.
+// Ajustes del ambiente (feature flags). Cada ambiente tiene los suyos.
 import { useState } from 'react';
 import { gql, SET_FLAG_MUTATION, time } from '../api.js';
-
-const FLAG_TITLE = {
-  ENABLE_DYNAMIC_SURGE_PRICING: 'Tarifa dinamica en hora pico',
-  ENABLE_FAST_CHARGE_BOOST: 'Ultra-carga prioritaria',
-  SIMULATE_CHARGER_HARDWARE_FAULT: 'Simular averia del cargador',
-};
+import { Icon } from '../icons.jsx';
+import { ENV_NAMES, FLAG_ORDER, FLAG_TEXTS } from '../labels.js';
 
 export function FlagsPanel({ flags, environment, onChange }) {
   const [pending, setPending] = useState(null);
   const [error, setError] = useState(null);
+  const ordered = [...flags].sort((a, b) => FLAG_ORDER.indexOf(a.name) - FLAG_ORDER.indexOf(b.name));
 
   async function toggle(flag) {
     setPending(flag.name);
@@ -18,60 +15,64 @@ export function FlagsPanel({ flags, environment, onChange }) {
     try {
       await gql(SET_FLAG_MUTATION, { name: flag.name, enabled: !flag.enabled });
       await onChange();
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      setError('No se pudo guardar el cambio. Inténtalo de nuevo.');
     } finally {
       setPending(null);
     }
   }
 
   return (
-    <section className="panel panel-flags" aria-labelledby="flags-title">
-      <div className="panel-head">
-        <h2 id="flags-title">Feature Flags</h2>
-        <span className="hint">
-          tabla <code>aegisvolt-feature-flags-{environment}</code>
-        </span>
-      </div>
+    <section className="panel" aria-labelledby="flags-title">
+      <header className="panel-head">
+        <h2 id="flags-title">
+          <Icon name="sliders" />
+          Ajustes del ambiente
+        </h2>
+      </header>
+      <p className="panel-intro">Se aplican en unos segundos y solo en {ENV_NAMES[environment] ?? environment}.</p>
 
       <ul className="flags">
-        {flags.map((flag) => (
-          <li key={flag.name} className={`flag ${flag.enabled ? 'flag-on' : 'flag-off'}`} data-testid={`flag-${flag.name}`}>
-            <div className="flag-text">
-              <span className="flag-title">{FLAG_TITLE[flag.name] ?? flag.name}</span>
-              <code className="flag-name">{flag.name}</code>
-              <span className="flag-desc">{flag.description}</span>
-              <span className="flag-meta">
-                {flag.updatedBy === 'terraform'
-                  ? 'valor inicial definido por Terraform'
-                  : `cambiada por ${flag.updatedBy ?? '—'} a las ${time(flag.updatedAt)}`}
-              </span>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={flag.enabled}
-              aria-label={`${FLAG_TITLE[flag.name] ?? flag.name}: ${flag.enabled ? 'activa' : 'inactiva'}`}
-              className="switch"
-              disabled={pending === flag.name}
-              onClick={() => toggle(flag)}
-              data-testid={`flag-toggle-${flag.name}`}
-            >
-              <span className="switch-knob" />
-              <span className="switch-label">{flag.enabled ? 'ON' : 'OFF'}</span>
-            </button>
-          </li>
-        ))}
+        {ordered.map((flag) => {
+          const text = FLAG_TEXTS[flag.name] ?? { title: flag.name, description: flag.description };
+          const descId = `flag-desc-${flag.name}`;
+          return (
+            <li key={flag.name} className={`flag${flag.enabled ? ' is-on' : ''}`} data-testid={`flag-${flag.name}`}>
+              <div className="flag-text">
+                <span className="flag-title">{text.title}</span>
+                <span className="flag-desc" id={descId}>
+                  {text.description}
+                </span>
+                <span className="flag-meta">
+                  {flag.updatedBy === 'terraform' || !flag.updatedAt ? 'Valor inicial' : `Cambiado a las ${time(flag.updatedAt)}`}
+                </span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={flag.enabled}
+                aria-describedby={descId}
+                aria-label={text.title}
+                className="switch"
+                disabled={pending === flag.name}
+                onClick={() => toggle(flag)}
+                data-testid={`flag-toggle-${flag.name}`}
+              >
+                <span className="switch-track" aria-hidden="true">
+                  <span className="switch-knob" />
+                </span>
+                <span className="switch-label">{flag.enabled ? 'Activo' : 'Inactivo'}</span>
+              </button>
+            </li>
+          );
+        })}
       </ul>
       {error && (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
+        <p className="callout callout-bad" role="alert">
+          <Icon name="alert" />
+          <span>{error}</span>
+        </p>
       )}
-      <p className="panel-foot">
-        Un cambio aqui (o por AWS CLI sobre la tabla) se aplica en segundos, sin redesplegar, y solo en{' '}
-        <b>{environment}</b>.
-      </p>
     </section>
   );
 }

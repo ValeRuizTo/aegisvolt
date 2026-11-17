@@ -1,8 +1,12 @@
-// Sesiones de carga activas con su telemetria mas reciente.
+// Cargas en curso con su telemetria mas reciente.
 import { useState } from 'react';
 import { gql, STOP_MUTATION } from '../api.js';
+import { Icon } from '../icons.jsx';
 
-export function SessionsPanel({ sessions, onChange }) {
+const number = (value, decimals = 1) =>
+  value == null ? '—' : new Intl.NumberFormat('es-CO', { maximumFractionDigits: decimals }).format(value);
+
+export function SessionsPanel({ sessions, stationNames, fleetNames, onChange }) {
   const [stopping, setStopping] = useState(null);
   const [error, setError] = useState(null);
 
@@ -12,34 +16,41 @@ export function SessionsPanel({ sessions, onChange }) {
     try {
       await gql(STOP_MUTATION, { sagaId });
       await onChange();
-    } catch (err) {
-      setError(err.message);
+    } catch {
+      setError('No se pudo detener la carga. Inténtalo de nuevo.');
     } finally {
       setStopping(null);
     }
   }
 
   return (
-    <section className="panel panel-sessions" aria-labelledby="sessions-title">
-      <div className="panel-head">
-        <h2 id="sessions-title">Cargas en curso</h2>
-        <span className="count">{sessions.length} activas</span>
-      </div>
+    <section className="panel" aria-labelledby="sessions-title">
+      <header className="panel-head">
+        <h2 id="sessions-title">
+          <Icon name="battery" />
+          Cargas en curso
+        </h2>
+        {sessions.length > 0 && <span className="panel-meta">{sessions.length} activas</span>}
+      </header>
 
       {sessions.length === 0 ? (
-        <p className="empty">No hay sesiones de carga activas.</p>
+        <p className="empty">Ningún vehículo está cargando ahora. Cuando inicies una carga, verás aquí su avance.</p>
       ) : (
         <ul className="sessions">
           {sessions.map((session) => {
             const t = session.latestTelemetry;
             const progress = t?.progressPercent ?? 0;
+            const done = t?.finished === true;
             return (
-              <li key={session.sagaId} className="session" data-testid="active-session">
+              <li key={session.sagaId} className={`session${done ? ' is-done' : ''}`} data-testid="active-session">
                 <div className="session-head">
-                  <strong>
-                    {session.stationId} / {session.connectorId}
-                  </strong>
-                  <span>{session.fleetId}</span>
+                  <div>
+                    <p className="session-place">
+                      {stationNames[session.stationId] ?? session.stationId} · {session.connectorId}
+                    </p>
+                    <p className="session-fleet">{fleetNames[session.fleetId] ?? session.fleetId}</p>
+                  </div>
+                  <span className="session-pct">{done ? 'Completa' : `${Math.round(progress)} %`}</span>
                 </div>
                 <div
                   className="progress"
@@ -53,32 +64,33 @@ export function SessionsPanel({ sessions, onChange }) {
                 </div>
                 <dl className="telemetry">
                   <div>
-                    <dt>Energia</dt>
+                    <dt>Energía</dt>
                     <dd>
-                      {t?.kwhDelivered ?? 0} / {session.targetKwh} kWh
+                      {number(t?.kwhDelivered)} / {number(session.targetKwh, 0)} kWh
                     </dd>
                   </div>
                   <div>
                     <dt>Potencia</dt>
-                    <dd>{t?.powerKw ?? '—'} kW</dd>
+                    <dd>{number(t?.powerKw)} kW</dd>
                   </div>
                   <div>
-                    <dt>Tension</dt>
-                    <dd>{t?.voltage ?? '—'} V</dd>
+                    <dt>Voltaje</dt>
+                    <dd>{number(t?.voltage, 0)} V</dd>
                   </div>
                   <div>
-                    <dt>Temp.</dt>
-                    <dd>{t?.connectorTempC ?? '—'} °C</dd>
+                    <dt>Temperatura</dt>
+                    <dd>{number(t?.connectorTempC)} °C</dd>
                   </div>
                 </dl>
                 <button
                   type="button"
-                  className="secondary"
+                  className="btn btn-secondary"
                   disabled={stopping === session.sagaId}
                   onClick={() => stop(session.sagaId)}
                   data-testid="stop-button"
                 >
-                  {stopping === session.sagaId ? 'Deteniendo…' : t?.finished ? 'Finalizar y liberar' : 'Detener carga'}
+                  <Icon name="stop" size={16} />
+                  {stopping === session.sagaId ? 'Deteniendo…' : done ? 'Terminar y liberar conector' : 'Detener carga'}
                 </button>
               </li>
             );
@@ -86,9 +98,10 @@ export function SessionsPanel({ sessions, onChange }) {
         </ul>
       )}
       {error && (
-        <div className="banner banner-error" role="alert">
-          {error}
-        </div>
+        <p className="callout callout-bad" role="alert">
+          <Icon name="alert" />
+          <span>{error}</span>
+        </p>
       )}
     </section>
   );

@@ -5,9 +5,9 @@ import { buildApp } from './app.js';
 // Flotas de ejemplo. FLEET-CARIBE tiene saldo bajo a proposito: sirve para
 // demostrar el fallo del paso 2 de la SAGA (fondos insuficientes).
 export const SEED_WALLETS = [
-  { fleetId: 'FLEET-ANDES', fleetName: 'Andes Express Logistica', balance: 500000 },
-  { fleetId: 'FLEET-PACIFICO', fleetName: 'Pacifico Ultima Milla', balance: 250000 },
-  { fleetId: 'FLEET-CARIBE', fleetName: 'Caribe Cargo (saldo bajo)', balance: 5000 },
+  { fleetId: 'FLEET-ANDES', fleetName: 'Andes Express Logística', balance: 500000 },
+  { fleetId: 'FLEET-PACIFICO', fleetName: 'Pacífico Última Milla', balance: 250000 },
+  { fleetId: 'FLEET-CARIBE', fleetName: 'Caribe Cargo', balance: 5000 },
 ];
 
 const { app, repository, config, logger, metrics } = buildApp();

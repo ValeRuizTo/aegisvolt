@@ -405,7 +405,14 @@ React + Vite, compilado y servido por nginx ([frontend/](../frontend)).
   hablar con `…/aegisvolt-dev/dev/graphql`. La misma imagen sirve a los tres ambientes.
 - **Tiempo real.** Sondeo cada 2,5 s de una única consulta. Alternativa: suscripciones GraphQL por
   WebSocket (menos latencia, más complejidad en gateway y API Gateway).
-- **Paneles.** (a) electrolineras y conectores · (b) reserva y activación (dispara la SAGA y muestra
-  los pasos y compensaciones) · (c) feature flags del ambiente, con interruptor · (d) historial de
-  SAGAs con sus compensaciones · además cargas en curso con telemetría y billeteras.
-- **Color por ambiente.** Verde `dev`, ámbar `test`, rojo `prod`.
+- **Secciones.** A la izquierda lo que se vigila: (a) *Electrolineras* y conectores · *Cargas en
+  curso* con telemetría · (d) *Historial de cargas* con lo que se deshizo. A la derecha lo que se
+  hace: (b) *Nueva carga* (dispara la SAGA) · *Billeteras* · (c) *Ajustes del ambiente* (feature
+  flags, con interruptor).
+- **Lenguaje de operador, detalle técnico a un clic.** La pantalla dice "carga cancelada, dinero
+  devuelto, conector liberado" en lugar de SAGA y compensación ([labels.js](../frontend/src/labels.js)
+  traduce los códigos del backend). Cada resultado tiene *Ver detalle técnico* con los pasos de la
+  SAGA, el servicio de cada uno, sus compensaciones y el `correlation_id`; el pie tiene el endpoint
+  GraphQL, las flags con su nombre interno y la versión de cada servicio.
+- **Color por ambiente.** La barra superior entera: verde `dev`, ámbar `test`, rojo `prod`. Los
+  botones usan un azul fijo para que en producción una acción normal no parezca peligrosa.

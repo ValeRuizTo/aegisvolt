@@ -108,3 +108,4 @@ export function TechnicalDetail({ operation }) {
     </details>
   );
 }
+

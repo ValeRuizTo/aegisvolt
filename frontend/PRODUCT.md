@@ -56,3 +56,4 @@ Datos sembrados de demostración: 3 electrolineras (Bogotá, Medellín, Cali), 9
 ## Accessibility & Inclusion
 Contraste WCAG AA, estados no comunicados solo por color, navegable con teclado, respeto a
 `prefers-reduced-motion`.
+

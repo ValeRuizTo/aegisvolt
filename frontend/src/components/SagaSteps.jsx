@@ -2,7 +2,7 @@
 //  - OperationSteps: lo que entiende el operador (que paso y que se deshizo).
 //  - TechnicalDetail: los pasos internos de la transaccion distribuida (SAGA),
 //    sus compensaciones y el correlation_id para rastrear en CloudWatch. Oculto
-//    por defecto; se usa para la sustentacion.
+//    por defecto; se usa en demostraciones y revisiones tecnicas.
 import { Icon } from '../icons.jsx';
 import { FAILED_LABELS, PENDING_LABELS, STEP_LABELS, UNDO_LABELS } from '../labels.js';
 

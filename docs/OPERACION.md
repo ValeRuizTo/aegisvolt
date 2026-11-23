@@ -127,3 +127,4 @@ estado inicial de un ambiente (conectores libres, saldos originales, sin histori
 ```bash
 scripts/demo/reset-data.sh dev
 ```
+

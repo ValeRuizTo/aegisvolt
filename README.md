@@ -119,3 +119,4 @@ una limitación del emulador que se explica.
 | Pipeline CD tras el merge (apply + canary por rama) | Probado | `feature/* → dev → test → prod` recorrido completo |
 | Protección de ramas (sin force push ni push directo) | Probado | `git push` a `test` rechazado con `GH006` |
 | "Tiempo real" en el frontend | Parcial | Sondeo cada 2,5 s (no WebSocket) |
+

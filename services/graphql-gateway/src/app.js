@@ -74,3 +74,4 @@ export async function buildApp(overrides = {}) {
   installErrorHandlers(app, { logger });
   return { app, apollo, clients, sagaStore, orchestrator, sagaDefinition, ...ctx };
 }
+

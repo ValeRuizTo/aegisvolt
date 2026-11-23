@@ -44,7 +44,7 @@ export async function buildApp(overrides = {}) {
     typeDefs,
     resolvers: buildResolvers({ config, clients, flags, sagaStore, orchestrator, sagaDefinition, logger }),
     // La introspeccion queda activa en todos los ambientes para poder explorar
-    // el esquema durante la sustentacion.
+    // el esquema en las demostraciones.
     introspection: true,
     formatError: (formatted) => {
       if (formatted.extensions?.code === 'INTERNAL_SERVER_ERROR') {

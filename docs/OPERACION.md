@@ -52,7 +52,7 @@ scripts/deploy/canary.sh dev billing-wallet-service v1.2.0   # un solo servicio
 scripts/smoke-test.sh prod                 # prueba de humo por el API Gateway
 ```
 
-Demostraciones: ver [GUIA-SUSTENTACION.md](GUIA-SUSTENTACION.md) y `scripts/demo/`.
+Demostraciones: scripts en `scripts/demo/` (fallo de la SAGA, flags, rollback del canary, versiones del estado, traza en CloudWatch y SAGA huérfana).
 
 <a id="github"></a>
 ## GitHub: repositorio, runner, protección de ramas y pipelines

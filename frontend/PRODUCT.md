@@ -12,8 +12,8 @@ despachador que, durante la jornada, reserva bahías de carga rápida para sus v
 carga avance y controla el saldo de la billetera de la flota. No es una persona técnica: piensa en
 vehículos, conectores, kWh y pesos, no en servicios ni transacciones distribuidas.
 
-Audiencia secundaria (confirmada): la estudiante que defiende el proyecto en una sustentación oral y
-necesita mostrar, a demanda, los detalles técnicos de cada operación.
+Audiencia secundaria (confirmada): evaluadores técnicos que necesitan ver, a demanda, los detalles
+técnicos de cada operación.
 
 ## Product Purpose
 Reservar un conector de carga, retener el saldo estimado y activar la carga en una sola acción; ver

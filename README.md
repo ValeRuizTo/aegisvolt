@@ -14,7 +14,6 @@ Toda la nube se emula en local con **Floci** (emulador de AWS): no se necesita c
 | Documento | Para qué sirve |
 |---|---|
 | [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md) | Qué es cada componente, por qué existe, cómo funciona y dónde está en el código |
-| [docs/GUIA-SUSTENTACION.md](docs/GUIA-SUSTENTACION.md) | Banco de preguntas del profesor con respuesta y comando de demostración |
 | [docs/OPERACION.md](docs/OPERACION.md) | Levantar todo desde cero, apagar, reiniciar y resolver problemas |
 
 ## Arquitectura en una imagen
@@ -115,7 +114,7 @@ una limitación del emulador que se explica.
 | Logs JSON con `correlation_id` en CloudWatch por ambiente | Probado | `scripts/demo/trace.sh` |
 | Flujos de Prefect (salud, SAGAs huérfanas, métricas) | Probado | Dashboard en :4200 |
 | Canary 20 % → análisis → 100 % o rollback | Probado | `scripts/deploy/canary.sh`, `scripts/demo/canary-rollback.sh` |
-| Frontend conectado al GraphQL de cada ambiente | Probado | Lenguaje de operador; detalle técnico desplegable para la sustentación |
+| Frontend conectado al GraphQL de cada ambiente | Probado | Lenguaje de operador; detalle técnico desplegable (pasos de la SAGA y correlation_id) |
 | Pipeline CI en cada Pull Request (6 checks) | Probado | Ejecutado en GitHub Actions sobre el runner auto-hospedado |
 | Pipeline CD tras el merge (apply + canary por rama) | Probado | `feature/* → dev → test → prod` recorrido completo |
 | Protección de ramas (sin force push ni push directo) | Probado | `git push` a `test` rechazado con `GH006` |
